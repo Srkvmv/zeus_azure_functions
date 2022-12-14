@@ -290,7 +290,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     Table_Data = dict(response.json())
     Table_data_df = pd.DataFrame(Table_Data['Columns'])
 
-    print (Table_data_df)
+    # print (Table_data_df)
 
     # original_df = pd.read_csv(req.files['Original'])
     original_df = pd.DataFrame.from_dict(dict(response.json())['TableData']).replace({np.nan: ''})
@@ -317,9 +317,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     primary_key_column = []
     primary_key_column.append(req.form['primaryKey'])
 
-    # print(req.form['fullMerge'])
+    try:
+        full_merge = req.form['fullMerge']
+        log.warn("Full merge value given")
+    except:
+        log.info("Not full merge")
+        full_merge = True
 
-    inserted, updated, deleted = merge(original_df=original_df, modified_df=modified_df, primary_key_columns=primary_key_column, full_merge=False, table=req.form['table'], schema=req.form['schema'])
+    inserted, updated, deleted = merge(original_df=original_df, modified_df=modified_df, primary_key_columns=primary_key_column, full_merge=full_merge, table=req.form['table'], schema=req.form['schema'])
 
     output =   dict({
                     "inserted_rows": 0,
