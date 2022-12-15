@@ -84,8 +84,8 @@ def stringify_table(original_table, modified_table, new_col_name='ModCheck', col
         # original_stringify_list = original_table[modified_table.columns].astype(str).apply('||'.join, axis = 1)
 
         # original_stringify_list is a hashed string representaion of a concatenated string of all values in columns common between original and modified dataframes seperated by '||'.
-        # original_stringify_list = original_table[modified_table.columns].astype(str).apply(lambda row: md5('||'.join(row).encode('utf-8')).hexdigest(), axis = 1)
-        original_stringify_list = original_table[modified_table.columns].astype(str).apply(lambda row: '||'.join(row), axis = 1)
+        original_stringify_list = original_table[modified_table.columns].astype(str).apply(lambda row: md5('||'.join(row).encode('utf-8')).hexdigest(), axis = 1)
+        # original_stringify_list = original_table[modified_table.columns].astype(str).apply(lambda row: '||'.join(row), axis = 1)
         original_df_stringified = original_table.copy()
         original_df_stringified[new_col_name] = original_stringify_list
 
@@ -93,8 +93,8 @@ def stringify_table(original_table, modified_table, new_col_name='ModCheck', col
         # modified_stringify_list = modified_table.astype(str).apply('||'.join, axis = 1)
 
         # modified_stringify_list is a hashed string representaion of a concatenated string of all values in a row seperated by '||'.
-        # modified_stringify_list = modified_table.astype(str).apply(lambda row: md5('||'.join(row).encode('utf-8')).hexdigest(), axis = 1)
-        modified_stringify_list = modified_table.astype(str).apply(lambda row: '||'.join(row), axis = 1)
+        modified_stringify_list = modified_table.astype(str).apply(lambda row: md5('||'.join(row).encode('utf-8')).hexdigest(), axis = 1)
+        # modified_stringify_list = modified_table.astype(str).apply(lambda row: '||'.join(row), axis = 1)
         modified_df_stringified = modified_table.copy()
         modified_df_stringified[new_col_name] = modified_stringify_list
 
@@ -159,11 +159,6 @@ def call_API(row_as_dict=[], list_row_as_dict=[], id_to_delete=0, list_id_to_del
     # delete a row
     elif(insert_update_delete_flag == 6):
         temp['ids'].append(id_to_delete)
-
-    # print(temp)
-    # out_file = open(".\API\\myfile2.json", "w")
-  
-    # json.dump(temp, out_file, indent = 4)
 
 
     # API call - specific to envoy API , to change call please change request as needed
@@ -318,11 +313,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     primary_key_column.append(req.form['primaryKey'])
 
     try:
-        full_merge = req.form['fullMerge']
+        full_merge = bool(req.form['fullMerge'])
         log.warn("Full merge value given")
     except:
         log.info("Not full merge")
-        full_merge = True
+        full_merge = False
 
     inserted, updated, deleted = merge(original_df=original_df, modified_df=modified_df, primary_key_columns=primary_key_column, full_merge=full_merge, table=req.form['table'], schema=req.form['schema'])
 
