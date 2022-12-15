@@ -213,12 +213,12 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
             log.info("API called for insert and returned status of {}".format(status_code))
             # Checking for successful inserts
             response_data = json.loads(response.text)[0]
-            if status_code == 200 and response_data['insert_errors'] == "":
-                inserted += 1
-            elif status_code == 200:
+            if status_code != 200:
+                log.error("API call error - {}".format(status_code))
+            elif response_data['insert_errors'] == None:
                 update_error += " {} : {},".format(i, response_data['insert_errors'])
             else:
-                log.error("API call error")
+                inserted += 1
 
         # Calling API for all the updated rows
         for i in range(len(updated_rows_df)):
@@ -233,12 +233,12 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
             log.info("API called for update and returned status of {}".format(status_code))
             # Checking for successful inserts
             response_data = json.loads(response.text)[0]
-            if status_code == 200 and response_data['update_errors'] == "":
-                updated += 1
-            elif status_code == 200:
+            if status_code != 200:
+                log.error("API call error - {}".format(status_code))
+            elif response_data['update_errors'] == None:
                 update_error += " {} : {},".format(i, response_data['update_errors'])
             else:
-                log.error("API call error")
+                updated += 1
 
         # For now only valid for a single primary key value, future work will be done for composite key
         if full_merge == True:
