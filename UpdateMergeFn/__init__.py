@@ -157,20 +157,25 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
     inserted = 0
     updated = 0
     deleted = 0
-    insert_error = ""
-    update_error = ""
-    delete_error = ""
+    insert_error = 0
+    update_error = 0
+    delete_error = 0
+
+    inserted_errors = []
+    updated_errors = []
 
     # Primay Key Column not Defined
     if len(primary_key_columns) < 1:
-        insert_error = insert_error + "Primary key is empty"
+        # insert_error = insert_error + "Primary key is empty"
+        log.error("Primary key is empty")
         return inserted, updated, deleted, insert_error, update_error, delete_error
 
 
     # Primary Key columns have Null Vakue
     for column in primary_key_columns:
         if modified_df[column].isna().max() == True:
-            insert_error = insert_error + "Primary key has null Values"
+            # insert_error = insert_error + "Primary key has null Values"
+            log.error("Primary key has null Values")
             return inserted, updated, deleted, insert_error, update_error, delete_error
 
     #Drop unwanted columns, like auto generated columns etc.
@@ -212,13 +217,28 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
             status_code = response.status_code
             log.info("API called for insert and returned status of {}".format(status_code))
             # Checking for successful inserts
-            response_data = json.loads(response.text)[0]
             if status_code != 200:
                 log.error("API call error - {}".format(status_code))
-            elif response_data['insert_errors'] == None:
-                update_error += " {} : {},".format(i, response_data['insert_errors'])
+                log.error("Error in inserting row")
+                log.error(inserted_rows_df.iloc[i][primary_key_columns].to_dict())
+                insert_error += 1
             else:
-                inserted += 1
+                try:
+                    response_data = json.loads(response.text)[0]
+                except:
+                    log.error("API call error - {}".format(status_code))
+                    log.error("Error in inserting row")
+                    log.error(inserted_rows_df.iloc[i][primary_key_columns].to_dict())
+                    insert_error +=1
+                    continue
+                if response_data['insert_errors'] != None:
+                    # insert_error += " {} : {},".format(inserted_rows_df.iloc[i][primary_key_columns], response_data['insert_errors'])
+                    log.error("API call error - {}".format(status_code))
+                    log.error(response_data['insert_errors'])
+                    log.error(inserted_rows_df.iloc[i][primary_key_columns].to_dict())
+                    insert_error += 1
+                else:
+                    inserted += 1
 
         # Calling API for all the updated rows
         for i in range(len(updated_rows_df)):
@@ -231,14 +251,29 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
             response = call_API(row_as_dict=intermediary, insert_update_delete_flag=2, table=table, schema=schema)
             status_code = response.status_code
             log.info("API called for update and returned status of {}".format(status_code))
-            # Checking for successful inserts
-            response_data = json.loads(response.text)[0]
+            # Checking for successful updates
             if status_code != 200:
+                update_error += 1
                 log.error("API call error - {}".format(status_code))
-            elif response_data['update_errors'] == None:
-                update_error += " {} : {},".format(i, response_data['update_errors'])
+                log.error("Error in updating row")
+                log.error(updated_rows_df.iloc[i][primary_key_columns].to_dict())
             else:
-                updated += 1
+                try:
+                    response_data = json.loads(response.text)[0]
+                except:
+                    update_error += 1
+                    log.error("API call error - {}".format(status_code))
+                    log.error("Error in updating row")
+                    log.error(updated_rows_df.iloc[i][primary_key_columns].to_dict())
+                    continue
+                if response_data['update_errors'] != None:
+                    # update_error += " {} : {},".format(updated_rows_df.iloc[i][primary_key_columns], response_data['update_errors'])
+                    log.error("API call error - {}".format(status_code))
+                    log.error(response_data['update_errors'])
+                    log.error(updated_rows_df.iloc[i][primary_key_columns].to_dict())
+                    update_error += 1
+                else:
+                    updated += 1
 
         # For now only valid for a single primary key value, future work will be done for composite key
         if full_merge == True:
@@ -249,14 +284,25 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
             if(len(deleted_row_ids) > 0):
                 response = call_API(list_id_to_delete = deleted_row_ids, insert_update_delete_flag=3, table=table, schema=schema)
                 status_code = response.status_code
-                response_data = json.loads(response.text)[0]
                 log.info("API called for delete and returned status of {}".format(status_code))
                 if status_code == 200:
-                    deleted += len(deleted_row_ids)
-                    delete_error += response_data['delete_errors']
+                    try:
+                        response_data = json.loads(response.text)[0]
+                        log.info(deleted_row_ids)
+                        log.warn(response_data['delete_errors'])
+                    except:
+                        log.warn("Problem with delete")
+                        log.warn(deleted_row_ids)
 
-            log.info(deleted_row_ids)
-            log.warn(response_data['delete_errors'])
+                    deleted += len(deleted_row_ids)
+                    # delete_error += response_data['delete_errors']
+                    
+                else:
+                    log.error(deleted_row_ids)
+                    log.error(response_data['delete_errors'])
+                    delete_error += len(deleted_row_ids)
+
+            
 
     else:
         ################################
@@ -357,9 +403,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     output['inserted_rows'] = inserted
     output['updated_rows'] = updated
     output['deleted_rows'] = deleted
-    output['insert_errors'] = insert_error
-    output['update_errors'] = update_error
-    output['delete_errors'] = delete_error
+    output['insert_errors'] = str(insert_error)
+    output['update_errors'] = str(update_error)
+    output['delete_errors'] = str(delete_error)
 
     log.critical(output)
 
