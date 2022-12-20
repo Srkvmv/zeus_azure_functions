@@ -57,17 +57,27 @@ def change_timestamp_to_string(dict_val):
     return dict_val
 
 #### Function to return IDs of modified rows
-def ModChecker(original_df_stringified, modified_df_stringified, primary_key_column, new_col_name = 'ModCheck'):
-    insert_key_list = list()
-    update_key_list = list()
-    for key in modified_df_stringified[primary_key_column]:
-        if key not in original_df_stringified[primary_key_column].values:
-            insert_key_list.append(key)
-        else:
-            if(original_df_stringified[original_df_stringified[primary_key_column] == key][new_col_name].values[0] != modified_df_stringified[modified_df_stringified[primary_key_column] == key][new_col_name].values[0]):
-                update_key_list.append(key)
+# def ModChecker(original_df_stringified, modified_df_stringified, primary_key_column, new_col_name = 'ModCheck'):
+#     insert_key_list = list()
+#     update_key_list = list()
+#     for key in modified_df_stringified[primary_key_column]:
+#         if key not in original_df_stringified[primary_key_column].values:
+#             insert_key_list.append(key)
+#         else:
+#             if(original_df_stringified[original_df_stringified[primary_key_column] == key][new_col_name].values[0] != modified_df_stringified[modified_df_stringified[primary_key_column] == key][new_col_name].values[0]):
+#                 update_key_list.append(key)
 
-    return insert_key_list,update_key_list
+#     return insert_key_list,update_key_list
+def ModChecker(original_df_stringified, modified_df_stringified, primary_key_column, new_col_name = 'ModCheck'):
+    temp_df = pd.merge(original_df_stringified[[primary_key_column, new_col_name]], modified_df_stringified[[primary_key_column]], how='outer', on=primary_key_column, indicator=True)
+    
+    insert_key_list = temp_df[temp_df['_merge'] == 'right_only'][primary_key_column].to_list()
+    delete_key_list = temp_df[temp_df['_merge'] == 'left_only'][primary_key_column].to_list()
+
+    temp_df2 = pd.merge(temp_df[temp_df['_merge'] == 'both'].drop(columns=['_merge']), modified_df_stringified[[new_col_name]], how='outer', on=new_col_name, indicator=True)
+    update_key_list = temp_df2[temp_df2['_merge'] == 'left_only'][primary_key_column].to_list()
+
+    return insert_key_list, update_key_list, delete_key_list
 
 
 #### Creating a new attribute which is a concatenated string of values in a row
@@ -195,7 +205,7 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
         original_df_stringified, modified_df_stringified, Mod_check_col = stringify_table(original_table=original_df_stringified, modified_table=checked_modified_df)
 
         # Get list of keys of modified and inserted rows
-        insert_key_list, update_key_list = ModChecker(original_df_stringified=original_df_stringified, modified_df_stringified=modified_df_stringified, primary_key_column=primary_key_hash, new_col_name=Mod_check_col)
+        insert_key_list, update_key_list, delete_key_list = ModChecker(original_df_stringified=original_df_stringified, modified_df_stringified=modified_df_stringified, primary_key_column=primary_key_hash, new_col_name=Mod_check_col)
 
         # Inserted and updated rows with primary hash dropped and all np.NaN values replaced with None
         inserted_rows_df = get_rows(modified_df=checked_modified_df, primary_key_column=primary_key_hash, key_list=insert_key_list).drop(columns=primary_key_hash, errors='ignore').replace({np.nan: ''})
@@ -277,9 +287,13 @@ def merge(original_df, modified_df, primary_key_columns, columns_to_drop=[], ful
 
         # For now only valid for a single primary key value, future work will be done for composite key
         if full_merge == True:
-            df_full= original_df.merge(modified_df[primary_key_columns].drop_duplicates(), on=primary_key_columns, how='left', indicator=True)
+            # df_full= original_df.merge(modified_df[primary_key_columns].drop_duplicates(), on=primary_key_columns, how='left', indicator=True)
             # deleted_row_ids = df_full[df_full['_merge'] == 'left_only'][primary_key_columns[0]].to_list()
-            deleted_row_ids = df_full[df_full['_merge'] == 'left_only'][primary_key_columns[0]].astype(str).to_list()
+            df_full = get_rows(modified_df=original_df_stringified, primary_key_column=primary_key_hash, key_list=delete_key_list).drop(columns=[primary_key_hash, Mod_check_col], errors='ignore').replace({np.nan: ''})
+
+            # deleted_row_ids = df_full[df_full['_merge'] == 'left_only'][primary_key_columns[0]].astype(str).to_list()
+            deleted_row_ids = df_full[primary_key_columns[0]].astype(str).to_list()
+
             # Calling API to delete all the ids not in modified table
             if(len(deleted_row_ids) > 0):
                 response = call_API(list_id_to_delete = deleted_row_ids, insert_update_delete_flag=3, table=table, schema=schema)
