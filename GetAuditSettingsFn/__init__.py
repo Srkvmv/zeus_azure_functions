@@ -41,7 +41,8 @@ def getEmailRecipients(auditIds : str, selectedReports: str):
     join_df_count = join_df.shape[0]
 
     # Retrieve audit data
-    audit_query = ("select d.DataAuditId,d.API,d.CRS,d.County,d.WellName,d.Operator FROM ZeusDataAudit.DATA_AUDIT d"
+    audit_query = ("select d.DataAuditId,d.API,d.CRS,d.County,d.WellName,d.Operator "
+    +" FROM ZeusDataAudit.DATA_AUDIT d"
     +" WHERE d.DataAuditId IN ({}) ORDER BY d.DataAuditId".format((',').join(auditList)))
 
     audit_df = pd.read_sql(audit_query, cnxn)
