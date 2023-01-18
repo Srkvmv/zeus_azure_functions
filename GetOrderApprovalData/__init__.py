@@ -30,6 +30,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 def getApprovalData(database:str, operator : str, auditIds : str, selectedReports: str):
 
     cnxn = connectDatabase(database)
+    schema = 'ZeusDataAudit'
+    if(database == 'oasis'):
+        schema = 'DataAudit'
     reportNames = selectedReports.split(',')
     reportNames.append('All')
     auditList = auditIds.split(',')
@@ -40,17 +43,16 @@ def getApprovalData(database:str, operator : str, auditIds : str, selectedReport
         reportNameClause = reportNameClause + "s.ReportName LIKE '%" + "%' OR s.ReportName LIKE '%".join(reportNames) + "%'"
 
     # Cross join settings and audit data for the selected report names
-    join_query = ("SELECT s.Id as SettingsId,d.DataAuditId,s.API,s.CRS,s.County,s.WellName,s.Operator,s.ReportName "
-    + ",s.OwnerEmail1,s.OwnerEmail2,s.OwnerEmail3,s.CopyEmail1,s.CopyEmail2,s.CopyEmail3,s.LastModifiedDate "
-    + "FROM orders.ORDER_MANAGEMENT_SETTINGS s CROSS JOIN DataAudit.DATA_AUDIT d "
+    join_query = ("SELECT s.SettingsId,d.DataAuditId,s.API,s.CRS,s.County,s.WellName,s.Operator,s.ReportName "
+    + ",s.ApproverEmail1,s.ApproverEmail2,s.ApproverEmail3,s.CopyEmail1,s.CopyEmail2,s.CopyEmail3,s.LastModifiedDate "
+    + "FROM orders.ORDER_MANAGEMENT_SETTINGS s CROSS JOIN {}.DATA_AUDIT d ".format(schema)
     + "where ({}) AND (s.Operator = '{}') ORDER BY d.DataAuditId".format(reportNameClause,operator))
 
     join_df = pd.read_sql(join_query, cnxn)
     join_df_count = join_df.shape[0]
 
     # Retrieve audit data
-    audit_query = ("select d.DataAuditId,d.API,d.CRS,d.County,d.WellName,d.Operator "
-    +" FROM DataAudit.DATA_AUDIT d"
+    audit_query = ("select d.DataAuditId,d.API,d.CRS,d.County,d.WellName,d.Operator FROM {}.DATA_AUDIT d".format(schema)
     +" WHERE d.DataAuditId IN ({}) ORDER BY d.DataAuditId".format((',').join(auditList)))
 
     audit_df = pd.read_sql(audit_query, cnxn)
@@ -80,7 +82,11 @@ def getApprovalData(database:str, operator : str, auditIds : str, selectedReport
         final_df = merged_df.assign(ReportName=merged_df['ReportName'].str.split(',')).explode('ReportName')
         final_df = final_df.sort_values(by=['Score','LastModifiedDate'], ascending = [False, False]).drop_duplicates(['ReportName', 'DataAuditId'])        
         # convert final dataframe to json format
-        return final_df[['DataAuditId','SettingsId','Operator_x','ReportName','Score','OwnerEmail1','OwnerEmail2','OwnerEmail3','CopyEmail1','CopyEmail2','CopyEmail3']].to_dict(orient ='records')
+        final_df['WellName'] = final_df.pop('WellName_y')
+        final_df['Operator'] = final_df.pop('Operator_y')
+        final_df['API'] = final_df.pop('API_y')
+        final_df = final_df.sort_values(by=['WellName'], ascending = [True])
+        return final_df[['API','SettingsId','DataAuditId','WellName','Operator','ReportName','ApproverEmail1','ApproverEmail2','ApproverEmail3']].to_dict(orient ='records')
     else:
         return {}
 
