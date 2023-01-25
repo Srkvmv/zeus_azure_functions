@@ -54,7 +54,7 @@ def getApprovalData(database:str, operator : str, auditIds : str, selectedReport
     # Retrieve audit data
     audit_query = ("select d.DataAuditId,d.API,d.CRS,d.County,d.WellName,d.Operator FROM {}.DATA_AUDIT d".format(schema)
     +" WHERE d.DataAuditId IN ({}) ORDER BY d.DataAuditId".format((',').join(auditList)))
-
+    print(audit_query)
     audit_df = pd.read_sql(audit_query, cnxn)
     audit_df_count = audit_df.shape[0]
 
@@ -88,7 +88,8 @@ def getApprovalData(database:str, operator : str, auditIds : str, selectedReport
         final_df = final_df.sort_values(by=['WellName'], ascending = [True])
         return final_df[['API','SettingsId','DataAuditId','WellName','Operator','ReportName','ApproverEmail1','ApproverEmail2','ApproverEmail3']].to_dict(orient ='records')
     else:
-        return {}
+        audit_df['ReportName'] = selectedReports;
+        return audit_df[['API','DataAuditId','WellName','Operator','ReportName']].to_dict(orient ='records')
 
 
 def connectDatabase(database : str):
