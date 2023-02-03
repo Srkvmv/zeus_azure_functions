@@ -13,13 +13,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     except ValueError:
         pass
     else:
-        operator = req_body.get('operator')
+        operator = req_body.get('operatorCode')
         auditIds = req_body.get('auditIds')
         selectedReports = req_body.get('selectedReports')
+        workflowType = req_body.get('workflowType')
         database = req_body.get('database')
 
     if operator and auditIds and selectedReports and database:
-        response = getApprovalData(database, operator, auditIds,selectedReports)
+        response = getApprovalData(database, operator, auditIds ,workflowType ,selectedReports)
     else:
         response = {}
     return func.HttpResponse(
@@ -27,7 +28,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
              status_code=200
         )
 
-def getApprovalData(database:str, operator : str, auditIds : str, selectedReports: str):
+def getApprovalData(database:str, operator:str, auditIds:str, workflowType:str, selectedReports:str):
 
     cnxn = connectDatabase(database)
     schema = 'ZeusDataAudit'
@@ -46,8 +47,8 @@ def getApprovalData(database:str, operator : str, auditIds : str, selectedReport
     join_query = ("SELECT s.SettingsId,d.DataAuditId,s.API,s.CRS,s.County,s.WellName,s.Operator,s.ReportName "
     + ",s.ApproverEmail1,s.ApproverEmail2,s.ApproverEmail3,s.CopyEmail1,s.CopyEmail2,s.CopyEmail3,s.LastModifiedDate "
     + "FROM orders.ORDER_MANAGEMENT_SETTINGS s CROSS JOIN {}.DATA_AUDIT d ".format(schema)
-    + "where ({}) AND (s.Operator = '{}') ORDER BY d.DataAuditId".format(reportNameClause,operator))
-
+    + "where ({}) AND (s.WorkflowType = '{}') AND s.active_yn = 'Y' AND (s.Operator = '{}') ORDER BY d.DataAuditId".format(reportNameClause,workflowType,operator))
+    print(join_query)
     join_df = pd.read_sql(join_query, cnxn)
     join_df_count = join_df.shape[0]
 
